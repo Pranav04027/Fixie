@@ -46,6 +46,7 @@ func_call = response.candidates[0].content.parts[0].function_call # pyright: ign
 
 function_call_result = call_function(func_call)
 
+
 # Calling function: get_file_content({'file_path': 'main.py'})
 if func_call:
     function_call_result = call_function(func_call)
