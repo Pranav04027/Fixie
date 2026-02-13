@@ -5,6 +5,7 @@ from google import genai
 from google.genai import types
 import argparse
 from prompts import system_prompt
+from call_function import available_functions
 
 model = "gemini-2.5-flash"
 
@@ -29,7 +30,7 @@ response = client.models.generate_content(
     model = model,
     contents = messages,
     config= types.GenerateContentConfig(
-        tools=[]
+        tools=[available_functions],
         system_instruction=system_prompt,
         temperature=0
         ),
@@ -38,13 +39,22 @@ response = client.models.generate_content(
 if not response.usage_metadata:
     raise RuntimeError("Response does not contain usage metadata.")
 
+func_call = response.candidates[0].content.parts[0].function_call # pyright: ignore[reportOptionalMemberAccess, reportOptionalSubscript]
 
-if args.verbose:
-    print(f"User prompt: {args.user_prompt}")
-    print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
-    print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
-    print(f"Response: {response.text}")
+if func_call:
+    print(f"Calling function: {func_call.name}({func_call.args})")
 else:
-    print(f"Response: {response.text}")
+    print("No function call returned.")
+
+
+
+# if args.verbose:
+#     print(f"User prompt: {args.user_prompt}")
+#     print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
+#     print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
+#     print(f"Response: {response.text}")
+# else:
+#     print(f"Response: {response.text}")
     
+
     
