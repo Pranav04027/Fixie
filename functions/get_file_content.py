@@ -29,9 +29,10 @@ def get_file_content(working_directory, file_path):
 
 schema_get_file_content = types.FunctionDeclaration(
     name="get_file_content",
-    description= f"Writes in a specified file relative to the working directory, returning the first {MAX_CHARS} characters. If a file exceeds the {MAX_CHARS} limit, the string: [...File 'file_path' truncated at {MAX_CHARS} characters] is added to the end of the returned data",
+    description= f"Reads a specified file relative to the working directory, returning the first {MAX_CHARS} characters. If a file exceeds the {MAX_CHARS} limit, the string: [...File 'file_path' truncated at {MAX_CHARS} characters] is added to the end of the returned data",
     parameters=types.Schema(
         type=types.Type.OBJECT,
+        required=["file_path"],
         properties={
             "file_path": types.Schema(
                 type=types.Type.STRING,
