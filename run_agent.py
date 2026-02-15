@@ -28,34 +28,35 @@ def run_agent(args, MODEL="gemini-2.5-flash"):
         )
 
         if not response or not response.candidates:
-            raise RuntimeError("No valid response fro`m model")
+            raise RuntimeError("No valid response from model")
 
         model_content = response.candidates[0].content
-        if not model_content or not model_content.parts:
-            raise RuntimeError("Empty model content")
+
+        if not model_content:
+            continue
 
         messages.append(model_content)
 
-        # find function calls
+        parts = model_content.parts or []
         function_calls = []
         
-        for p in model_content.parts:
+        for p in parts:
             if p.function_call:
                 function_calls.append(p.function_call)
             
             if p.thought:
                 print(f"DEBUG Thought: {p.thought}")
 
-        # If no function call → final answer
         if not function_calls:
-            result = ""
-            for part in model_content.parts:
-                result.join(part.text or "")
+            result = "".join(part.text for part in parts if part.text)
             
-            if result:
+            if result.strip():
                 return result
-            else:
-                "Task Complete"
+            
+            if any(p.thought for p in parts):
+                continue
+                
+            return "Task Complete"
                 
         tool_parts = []
         for fc in function_calls:
@@ -70,7 +71,6 @@ def run_agent(args, MODEL="gemini-2.5-flash"):
                 )
             )
 
-        # Send tool results back to model
         messages.append(types.Content(role="user", parts=tool_parts))
 
     raise RuntimeError("Agent exceeded maximum iterations.")
