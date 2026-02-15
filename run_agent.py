@@ -10,52 +10,67 @@ api_key = os.environ.get("GEMINI_API_KEY")
 if not api_key:
     raise RuntimeError("GEMINI_API_KEY environment variable is not set.")
 
-def run_agent(args, MODEL = "gemini-2.5-flash"):
-    
-    client = genai.Client(api_key= api_key)
-    
-    messages = [types.Content(
-      role="User",
-      parts=[types.Part(text = args.user_prompt)]  
-    )]
-    
-    
+
+def run_agent(args, MODEL="gemini-2.5-flash"):
+    client = genai.Client(api_key=api_key)
+
+    messages = [types.Content(role="user", parts=[types.Part(text=args.user_prompt)])]
+
     for _ in range(20):
         response = client.models.generate_content(
             model=MODEL,
             contents=messages,
             config=types.GenerateContentConfig(
-                tools=[available_functions],
+                tools=[types.Tool(function_declarations=available_functions)],   #type: ignore
                 system_instruction=system_prompt,
                 temperature=0,
             ),
         )
 
-        if not response.candidates:
-            raise RuntimeError("No candidates returned from model.")
+        if not response or not response.candidates:
+            raise RuntimeError("No valid response fro`m model")
 
-        for candidate in response.candidates:
-            if not candidate.content:
-                raise RuntimeError("Candidate content is None.")
-            messages.append(candidate.content)
+        model_content = response.candidates[0].content
+        if not model_content or not model_content.parts:
+            raise RuntimeError("Empty model content")
 
-        first_candidate = response.candidates[0]
+        messages.append(model_content)
 
-        if not first_candidate.content or not first_candidate.content.parts:
-            raise RuntimeError("Candidate content parts missing.")
+        # find function calls
+        function_calls = []
+        
+        for p in model_content.parts:
+            if p.function_call:
+                function_calls.append(p.function_call)
+            
+            if p.thought:
+                print(f"DEBUG Thought: {p.thought}")
 
-        part = first_candidate.content.parts[0]
+        # If no function call → final answer
+        if not function_calls:
+            result = ""
+            for part in model_content.parts:
+                result.join(part.text or "")
+            
+            if result:
+                return result
+            else:
+                "Task Complete"
+                
+        tool_parts = []
+        for fc in function_calls:
+            result = call_function(fc, args.verbose)
 
-        if not part.function_call:
-            return part.text or "No response."
+            tool_parts.append(
+                types.Part(
+                    function_response=types.FunctionResponse(
+                        name=fc.name,
+                        response=result,
+                    )
+                )
+            )
 
-        function_result = call_function(part.function_call)
+        # Send tool results back to model
+        messages.append(types.Content(role="user", parts=tool_parts))
 
-        if not function_result.parts:
-            raise RuntimeError("Function returned no parts.")
-
-        messages.append(types.Content(role="user", parts=function_result.parts))
-
-
-
-    raise RuntimeError("Agent exceeded maximum iterations without final response.")
+    raise RuntimeError("Agent exceeded maximum iterations.")
